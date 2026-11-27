@@ -19,7 +19,6 @@ function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<'
 
 // Stepped scenes: one gesture = one scene
 const N = 5, reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; let s = 0, lock = 0, acc = 0, last = 0, lastDelta = 0, introActive = true;
-const dots = $('#dots'); for (let i = 0; i < N; i++) { const b = document.createElement('button'); b.setAttribute('aria-label', 'Scene ' + (i + 1)); b.onclick = () => go(i); dots.appendChild(b); }
 const nav = $('nav'), menuToggle = $('.menu-toggle');
 function closeMenu() { nav.removeAttribute('data-open'); menuToggle.setAttribute('aria-expanded', 'false'); menuToggle.setAttribute('aria-label', 'Open navigation menu'); }
 menuToggle.addEventListener('click', () => {
@@ -29,7 +28,7 @@ menuToggle.addEventListener('click', () => {
   nav.dataset.open = String(open);
 });
 function go(n) { if (introActive) return; n = Math.max(0, Math.min(N - 1, n)); if (n === s) return; s = n; stage.dataset.s = n;
-  [...dots.children].forEach((b, i) => b.classList.toggle('on', i === n)); lock = performance.now() + (reduce ? 0 : 1000); }
+  lock = performance.now() + (reduce ? 0 : 500); }
 function step(d) { if (performance.now() < lock) return; go(s + d); }
 let introTimer = setTimeout(beginIntro, 3500);
 Promise.all([document.fonts.ready, $('.coco img').decode()]).then(beginIntro).catch(e => { console.warn('Starting the intro without all assets ready.', e); beginIntro(); });
@@ -52,17 +51,30 @@ addEventListener('wheel', e => { const now = performance.now(), panel = e.target
   last = now; lastDelta = e.deltaY;
   if (now < lock || introActive) { acc = 0; return; }
   acc += e.deltaY; if (Math.abs(acc) > 24) { step(Math.sign(acc)); acc = 0; } }, { passive: false });
-let ty = null, touchPanel = null;
-addEventListener('touchstart', e => { ty = e.touches[0].clientY; touchPanel = e.target.closest('.p2, .cta'); }, { passive: true });
-addEventListener('touchmove', e => { if (ty == null) return; const dy = ty - e.touches[0].clientY;
-  if (Math.abs(dy) <= 40) return;
-  if (canScrollWithin(touchPanel, dy)) { ty = e.touches[0].clientY; return; }
+let touchStart = null;
+addEventListener('touchstart', e => {
+  if (e.touches.length !== 1) { touchStart = null; return; }
+  const target = e.target;
+  touchStart = {
+    x: e.touches[0].clientX,
+    y: e.touches[0].clientY,
+    panel: target.closest('.p2, .cta'),
+    interactive: !!target.closest('a, button, input, textarea, select, [contenteditable="true"], .links')
+  };
+}, { passive: true });
+addEventListener('touchmove', e => {
+  if (!touchStart || e.touches.length !== 1 || touchStart.interactive) return;
+  const touch = e.touches[0], dx = touchStart.x - touch.clientX, dy = touchStart.y - touch.clientY;
+  if (Math.abs(dy) <= 40 || Math.abs(dx) >= Math.abs(dy)) return;
+  if (canScrollWithin(touchStart.panel, dy)) { touchStart.x = touch.clientX; touchStart.y = touch.clientY; return; }
   e.preventDefault();
   if (!introActive && performance.now() >= lock) step(Math.sign(dy));
-  ty = null; }, { passive: false });
-addEventListener('touchend', () => { ty = null; touchPanel = null; }, { passive: true });
+  touchStart = null;
+}, { passive: false });
+addEventListener('touchend', () => { touchStart = null; }, { passive: true });
 addEventListener('keydown', e => { const k = e.key;
   if (k === 'Escape' && menuToggle.getAttribute('aria-expanded') === 'true') { closeMenu(); menuToggle.focus(); return; }
+  if (e.target.closest('input, textarea, select, button, a, [contenteditable="true"]')) return;
   if (['ArrowDown', 'PageDown', ' '].includes(k)) { e.preventDefault(); step(1); } else if (['ArrowUp', 'PageUp'].includes(k)) { e.preventDefault(); step(-1); }
   else if (k === 'Home') go(0); else if (k === 'End') go(N - 1); });
 document.addEventListener('pointerdown', e => { if (menuToggle.getAttribute('aria-expanded') === 'true' && !nav.contains(e.target)) closeMenu(); });
