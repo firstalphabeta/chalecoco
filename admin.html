@@ -1,0 +1,21 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>ChaleCoco Admin</title><link href="https://fonts.googleapis.com/css2?family=Agbalumo&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box}body{margin:0;background:#FBEEDB;color:#26361a;font:15px Poppins,sans-serif;padding:20px}main{max-width:720px;margin:auto}
+h1{font:400 32px Agbalumo,cursive;color:#34501F}input,select,button{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid #34501F55;background:#fff;min-height:44px}
+button{background:#34501F;color:#fff;border:0;cursor:pointer;font-weight:600}button.x{background:#a3321f}button.g{background:#fff;color:#34501F;border:1px solid #34501F}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.row input{flex:1;min-width:150px}.card{background:#fff;border-radius:16px;padding:14px;margin:10px 0;display:grid;gap:8px}.card.off{opacity:.55}
+#msg{min-height:1.4em;color:#a3321f}</style></head><body><main><h1>ChaleCoco Admin</h1>
+<div class="row"><input id="api" placeholder="Apps Script Web App URL"><input id="pw" type="password" placeholder="Admin password"><button id="load">Load</button></div><p id="msg"></p>
+<div id="add" hidden><h3>Add a product</h3><div class="row"><input id="n" placeholder="Name"><input id="d" placeholder="Short description"></div>
+<div class="row"><input id="pr" placeholder="Price (GH₵, optional)"><select id="t"><option value="green">Green</option><option value="pink">Pink</option></select><button id="addb">Add</button></div></div><div id="list"></div>
+<script>
+const $=s=>document.querySelector(s);$('#api').value=localStorage.api||'';
+const call=async(b)=>{const r=await fetch($('#api').value,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({pw:$('#pw').value,...b})});return r.json()};
+function draw(ps){$('#list').innerHTML=ps.map(p=>`<div class="card ${p.active?'':'off'}"><b>${esc(p.name)}</b><small>${esc(p.desc)}</small>
+<div class="row"><input value="${esc(p.price)}" placeholder="Price" onchange="up('${p.id}',{price:this.value})"><button class="g" onclick="up('${p.id}',{active:${!p.active}})">${p.active?'Hide':'Show'}</button><button class="x" onclick="del('${p.id}')">Delete</button></div></div>`).join('')}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function run(b){$('#msg').textContent='';try{const r=await call(b);if(r.error)throw r.error;draw(r.products);$('#add').hidden=false}catch(e){$('#msg').textContent=String(e)}}
+$('#load').onclick=async()=>{localStorage.api=$('#api').value;try{const r=await(await fetch($('#api').value+'?pw='+encodeURIComponent($('#pw').value))).json();draw(r.products);$('#add').hidden=false}catch(e){$('#msg').textContent='Could not load. Check the URL and password.'}};
+const up=(id,p)=>run({action:'update',id,p}),del=id=>confirm('Delete this product?')&&run({action:'delete',id});
+$('#addb').onclick=()=>run({action:'add',p:{name:$('#n').value,desc:$('#d').value,price:$('#pr').value,tone:$('#t').value}});
+</script></main></body></html>
